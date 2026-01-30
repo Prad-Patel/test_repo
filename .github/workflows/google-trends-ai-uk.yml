@@ -1,0 +1,242 @@
+name: Google Trends AI UK Investigation
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run weekly on Mondays at 9:00 AM UTC
+    - cron: '0 9 * * 1'
+
+jobs:
+  investigate-trends:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pytrends pandas tabulate
+
+      - name: Investigate Google Trends for AI in UK
+        run: |
+          python << 'EOF'
+          from pytrends.request import TrendReq
+          import pandas as pd
+          from tabulate import tabulate
+          from datetime import datetime
+          import time
+
+          # Initialize pytrends
+          pytrends = TrendReq(hl='en-GB', tz=0)
+
+          print("=" * 70)
+          print("GOOGLE TRENDS: AI IN THE UK - INVESTIGATION REPORT")
+          print(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC")
+          print("=" * 70)
+
+          # Define AI-related keywords to investigate
+          ai_keywords = [
+              'artificial intelligence',
+              'ChatGPT',
+              'machine learning',
+              'AI UK',
+              'generative AI'
+          ]
+
+          # Additional trending AI topics
+          ai_topics_secondary = [
+              'Claude AI',
+              'Copilot AI',
+              'AI jobs UK',
+              'AI regulation UK',
+              'OpenAI'
+          ]
+
+          def get_interest_over_time(keywords, geo='GB', timeframe='today 12-m'):
+              """Fetch interest over time for given keywords in UK"""
+              try:
+                  pytrends.build_payload(keywords, cat=0, timeframe=timeframe, geo=geo)
+                  data = pytrends.interest_over_time()
+                  return data
+              except Exception as e:
+                  print(f"Error fetching data: {e}")
+                  return None
+
+          def get_related_queries(keyword, geo='GB'):
+              """Fetch related queries for a keyword"""
+              try:
+                  pytrends.build_payload([keyword], cat=0, timeframe='today 12-m', geo=geo)
+                  related = pytrends.related_queries()
+                  return related
+              except Exception as e:
+                  print(f"Error fetching related queries: {e}")
+                  return None
+
+          def get_interest_by_region(keywords, geo='GB'):
+              """Fetch interest by region within UK"""
+              try:
+                  pytrends.build_payload(keywords, cat=0, timeframe='today 12-m', geo=geo)
+                  by_region = pytrends.interest_by_region(resolution='COUNTRY', inc_low_vol=True)
+                  return by_region
+              except Exception as e:
+                  print(f"Error fetching regional data: {e}")
+                  return None
+
+          # 1. Interest Over Time Analysis
+          print("\n" + "=" * 70)
+          print("1. INTEREST OVER TIME (Past 12 Months - UK)")
+          print("=" * 70)
+
+          data = get_interest_over_time(ai_keywords)
+          if data is not None and not data.empty:
+              # Get average interest for each keyword
+              avg_interest = data.drop('isPartial', axis=1, errors='ignore').mean().sort_values(ascending=False)
+              print("\nAverage Search Interest (0-100 scale):")
+              print("-" * 40)
+              for keyword, value in avg_interest.items():
+                  bar = "█" * int(value / 5)
+                  print(f"{keyword:25} | {value:5.1f} | {bar}")
+
+              # Show recent trend
+              print("\nMost Recent Week's Interest:")
+              print("-" * 40)
+              recent = data.drop('isPartial', axis=1, errors='ignore').tail(1)
+              for col in recent.columns:
+                  print(f"{col:25} | {recent[col].values[0]:5.0f}")
+          else:
+              print("Could not retrieve interest over time data.")
+
+          time.sleep(2)  # Rate limiting
+
+          # 2. Secondary AI Topics
+          print("\n" + "=" * 70)
+          print("2. SECONDARY AI TOPICS INTEREST (Past 12 Months - UK)")
+          print("=" * 70)
+
+          data_secondary = get_interest_over_time(ai_topics_secondary)
+          if data_secondary is not None and not data_secondary.empty:
+              avg_interest = data_secondary.drop('isPartial', axis=1, errors='ignore').mean().sort_values(ascending=False)
+              print("\nAverage Search Interest (0-100 scale):")
+              print("-" * 40)
+              for keyword, value in avg_interest.items():
+                  bar = "█" * int(value / 5)
+                  print(f"{keyword:25} | {value:5.1f} | {bar}")
+          else:
+              print("Could not retrieve secondary topics data.")
+
+          time.sleep(2)  # Rate limiting
+
+          # 3. Related Queries for "artificial intelligence"
+          print("\n" + "=" * 70)
+          print("3. RELATED QUERIES FOR 'ARTIFICIAL INTELLIGENCE' IN UK")
+          print("=" * 70)
+
+          related = get_related_queries('artificial intelligence')
+          if related and 'artificial intelligence' in related:
+              ai_related = related['artificial intelligence']
+
+              if ai_related['top'] is not None and not ai_related['top'].empty:
+                  print("\nTop Related Queries:")
+                  print("-" * 40)
+                  top_queries = ai_related['top'].head(10)
+                  print(tabulate(top_queries, headers='keys', tablefmt='simple', showindex=False))
+
+              if ai_related['rising'] is not None and not ai_related['rising'].empty:
+                  print("\nRising Queries (Breakout trends):")
+                  print("-" * 40)
+                  rising = ai_related['rising'].head(10)
+                  print(tabulate(rising, headers='keys', tablefmt='simple', showindex=False))
+          else:
+              print("Could not retrieve related queries.")
+
+          time.sleep(2)  # Rate limiting
+
+          # 4. Related Queries for "ChatGPT"
+          print("\n" + "=" * 70)
+          print("4. RELATED QUERIES FOR 'CHATGPT' IN UK")
+          print("=" * 70)
+
+          related_chatgpt = get_related_queries('ChatGPT')
+          if related_chatgpt and 'ChatGPT' in related_chatgpt:
+              chatgpt_related = related_chatgpt['ChatGPT']
+
+              if chatgpt_related['top'] is not None and not chatgpt_related['top'].empty:
+                  print("\nTop Related Queries:")
+                  print("-" * 40)
+                  top_queries = chatgpt_related['top'].head(10)
+                  print(tabulate(top_queries, headers='keys', tablefmt='simple', showindex=False))
+
+              if chatgpt_related['rising'] is not None and not chatgpt_related['rising'].empty:
+                  print("\nRising Queries:")
+                  print("-" * 40)
+                  rising = chatgpt_related['rising'].head(10)
+                  print(tabulate(rising, headers='keys', tablefmt='simple', showindex=False))
+          else:
+              print("Could not retrieve ChatGPT related queries.")
+
+          time.sleep(2)  # Rate limiting
+
+          # 5. Trending AI Searches (Real-time)
+          print("\n" + "=" * 70)
+          print("5. TRENDING SEARCHES (Real-time UK)")
+          print("=" * 70)
+
+          try:
+              trending = pytrends.trending_searches(pn='united_kingdom')
+              if trending is not None and not trending.empty:
+                  # Filter for AI-related terms
+                  ai_terms = ['ai', 'artificial', 'chatgpt', 'gpt', 'machine learning',
+                             'robot', 'automation', 'openai', 'claude', 'copilot', 'gemini']
+
+                  print("\nCurrent Trending Searches in UK:")
+                  print("-" * 40)
+                  for idx, search in enumerate(trending[0].head(20)):
+                      print(f"{idx+1:2}. {search}")
+
+                  # Check for AI-related trending
+                  ai_trending = [s for s in trending[0] if any(term in s.lower() for term in ai_terms)]
+                  if ai_trending:
+                      print("\nAI-Related Trending Searches Found:")
+                      print("-" * 40)
+                      for search in ai_trending:
+                          print(f"  - {search}")
+                  else:
+                      print("\nNo explicitly AI-related trending searches at this moment.")
+          except Exception as e:
+              print(f"Could not retrieve trending searches: {e}")
+
+          # 6. Summary
+          print("\n" + "=" * 70)
+          print("SUMMARY & KEY INSIGHTS")
+          print("=" * 70)
+          print("""
+          - This report shows AI-related search trends in the United Kingdom
+          - Interest is measured on a scale of 0-100 (relative to peak interest)
+          - Rising queries indicate emerging topics gaining traction
+          - Data sourced from Google Trends API
+
+          Note: Google Trends data is relative, not absolute search volumes.
+          A value of 100 represents peak popularity for the term.
+          """)
+
+          print("\n" + "=" * 70)
+          print("END OF REPORT")
+          print("=" * 70)
+          EOF
+
+      - name: Upload results as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: google-trends-ai-uk-report
+          path: |
+            *.csv
+            *.json
+          retention-days: 30
+          if-no-files-found: ignore
