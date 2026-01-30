@@ -6,6 +6,10 @@ on:
     # Run weekly on Mondays at 9:00 AM UTC
     - cron: '0 9 * * 1'
 
+env:
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+
 jobs:
   investigate-trends:
     runs-on: ubuntu-latest
@@ -21,11 +25,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pytrends pandas tabulate
+          pip install pytrends pandas tabulate requests
 
       - name: Investigate Google Trends for AI in UK
         run: |
-          python << 'EOF'
+          python << 'EOF' | tee google_trends_report.txt
           from pytrends.request import TrendReq
           import pandas as pd
           from tabulate import tabulate
@@ -230,12 +234,87 @@ jobs:
           print("=" * 70)
           EOF
 
+      - name: Send report to Telegram
+        run: |
+          python << 'EOF'
+          import requests
+          import os
+
+          BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+          CHANNEL_ID = os.environ.get('TELEGRAM_CHANNEL_ID')
+
+          if not BOT_TOKEN or not CHANNEL_ID:
+              print("Error: Telegram credentials not configured")
+              exit(1)
+
+          # Read the report
+          with open('google_trends_report.txt', 'r') as f:
+              report = f.read()
+
+          # Telegram has a 4096 character limit per message
+          # Split the report into chunks if needed
+          MAX_LENGTH = 4000
+
+          def send_message(text):
+              url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+              payload = {
+                  "chat_id": CHANNEL_ID,
+                  "text": text,
+                  "parse_mode": "HTML"
+              }
+              response = requests.post(url, json=payload)
+              return response.json()
+
+          # Send header
+          header = "<b>Google Trends: AI in the UK - Weekly Report</b>\n\n"
+
+          # Split report into chunks
+          chunks = []
+          current_chunk = header
+
+          for line in report.split('\n'):
+              # Escape HTML special characters
+              line = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+              if len(current_chunk) + len(line) + 1 > MAX_LENGTH:
+                  chunks.append(current_chunk)
+                  current_chunk = ""
+              current_chunk += line + '\n'
+
+          if current_chunk:
+              chunks.append(current_chunk)
+
+          # Send each chunk
+          print(f"Sending report in {len(chunks)} message(s)...")
+          for i, chunk in enumerate(chunks):
+              # Use monospace formatting for the report
+              formatted_chunk = f"<pre>{chunk}</pre>" if i > 0 else chunk.replace(header, '')
+              if i == 0:
+                  formatted_chunk = header + f"<pre>{chunk.replace(header, '')}</pre>"
+
+              result = send_message(formatted_chunk)
+              if result.get('ok'):
+                  print(f"Message {i+1}/{len(chunks)} sent successfully")
+              else:
+                  print(f"Failed to send message {i+1}: {result}")
+
+          print("Report sent to Telegram successfully!")
+          EOF
+
+      - name: Send report as document to Telegram
+        run: |
+          curl -F "chat_id=${{ secrets.TELEGRAM_CHANNEL_ID }}" \
+               -F "document=@google_trends_report.txt" \
+               -F "caption=Google Trends AI UK Report - $(date '+%Y-%m-%d')" \
+               "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument"
+
       - name: Upload results as artifact
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: google-trends-ai-uk-report
           path: |
+            *.txt
             *.csv
             *.json
           retention-days: 30
