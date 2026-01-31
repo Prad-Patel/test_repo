@@ -1,4 +1,4 @@
-name: Google Trends AI UK Investigation
+name: Google Trends AI Small Business UK
 
 on:
   workflow_dispatch:
@@ -71,16 +71,16 @@ jobs:
               return None
 
           print("=" * 60)
-          print("GOOGLE TRENDS: AI IN THE UK")
+          print("GOOGLE TRENDS: AI & SMALL BUSINESS UK")
           print(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC")
           print("=" * 60)
 
-          # Simplified keyword list to reduce API calls
-          ai_keywords = ['ChatGPT', 'artificial intelligence', 'AI']
+          # Keywords focused on AI impact on small businesses
+          ai_keywords = ['AI small business', 'AI for business', 'ChatGPT business']
 
           # 1. Interest Over Time Analysis
           print("\n" + "=" * 60)
-          print("1. AI SEARCH INTEREST (Past 12 Months - UK)")
+          print("1. AI + SMALL BUSINESS INTEREST (Past 12 Months - UK)")
           print("=" * 60)
 
           def fetch_interest():
@@ -109,29 +109,29 @@ jobs:
           print("\nWaiting before next request...")
           time.sleep(30 + random.uniform(5, 15))
 
-          # 2. Related Queries for ChatGPT
+          # 2. Related Queries for AI small business
           print("\n" + "=" * 60)
-          print("2. RELATED QUERIES FOR 'CHATGPT' IN UK")
+          print("2. RELATED QUERIES FOR 'AI SMALL BUSINESS' IN UK")
           print("=" * 60)
 
-          def fetch_chatgpt_related():
+          def fetch_ai_smb_related():
               pt = create_pytrends()
-              pt.build_payload(['ChatGPT'], cat=0, timeframe='today 12-m', geo='GB')
+              pt.build_payload(['AI small business'], cat=0, timeframe='today 12-m', geo='GB')
               return pt.related_queries()
 
-          related = retry_with_backoff(fetch_chatgpt_related, "ChatGPT related queries")
-          if related and 'ChatGPT' in related:
-              chatgpt_data = related['ChatGPT']
+          related = retry_with_backoff(fetch_ai_smb_related, "AI small business related queries")
+          if related and 'AI small business' in related:
+              smb_data = related['AI small business']
 
-              if chatgpt_data.get('top') is not None and not chatgpt_data['top'].empty:
+              if smb_data.get('top') is not None and not smb_data['top'].empty:
                   print("\nTop Related Queries:")
                   print("-" * 45)
-                  print(tabulate(chatgpt_data['top'].head(10), headers='keys', tablefmt='simple', showindex=False))
+                  print(tabulate(smb_data['top'].head(10), headers='keys', tablefmt='simple', showindex=False))
 
-              if chatgpt_data.get('rising') is not None and not chatgpt_data['rising'].empty:
+              if smb_data.get('rising') is not None and not smb_data['rising'].empty:
                   print("\nRising Queries (Breakout trends):")
                   print("-" * 45)
-                  print(tabulate(chatgpt_data['rising'].head(10), headers='keys', tablefmt='simple', showindex=False))
+                  print(tabulate(smb_data['rising'].head(10), headers='keys', tablefmt='simple', showindex=False))
           else:
               print("Could not retrieve related queries.")
 
@@ -139,29 +139,29 @@ jobs:
           print("\nWaiting before next request...")
           time.sleep(30 + random.uniform(5, 15))
 
-          # 3. Related Queries for AI
+          # 3. Related Queries for AI automation
           print("\n" + "=" * 60)
-          print("3. RELATED QUERIES FOR 'AI' IN UK")
+          print("3. RELATED QUERIES FOR 'AI AUTOMATION BUSINESS' IN UK")
           print("=" * 60)
 
-          def fetch_ai_related():
+          def fetch_automation_related():
               pt = create_pytrends()
-              pt.build_payload(['AI'], cat=0, timeframe='today 12-m', geo='GB')
+              pt.build_payload(['AI automation business'], cat=0, timeframe='today 12-m', geo='GB')
               return pt.related_queries()
 
-          ai_related = retry_with_backoff(fetch_ai_related, "AI related queries")
-          if ai_related and 'AI' in ai_related:
-              ai_data = ai_related['AI']
+          auto_related = retry_with_backoff(fetch_automation_related, "AI automation related queries")
+          if auto_related and 'AI automation business' in auto_related:
+              auto_data = auto_related['AI automation business']
 
-              if ai_data.get('top') is not None and not ai_data['top'].empty:
+              if auto_data.get('top') is not None and not auto_data['top'].empty:
                   print("\nTop Related Queries:")
                   print("-" * 45)
-                  print(tabulate(ai_data['top'].head(10), headers='keys', tablefmt='simple', showindex=False))
+                  print(tabulate(auto_data['top'].head(10), headers='keys', tablefmt='simple', showindex=False))
 
-              if ai_data.get('rising') is not None and not ai_data['rising'].empty:
+              if auto_data.get('rising') is not None and not auto_data['rising'].empty:
                   print("\nRising Queries (Breakout trends):")
                   print("-" * 45)
-                  print(tabulate(ai_data['rising'].head(10), headers='keys', tablefmt='simple', showindex=False))
+                  print(tabulate(auto_data['rising'].head(10), headers='keys', tablefmt='simple', showindex=False))
           else:
               print("Could not retrieve related queries.")
 
@@ -170,7 +170,8 @@ jobs:
           print("SUMMARY")
           print("=" * 60)
           print("""
-          This report shows AI search trends in the UK.
+          This report shows AI + Small Business search trends in the UK.
+          Focus: How AI is impacting small businesses
           - Interest: 0-100 scale (relative to peak)
           - Rising: Queries gaining significant traction
           - Data: Google Trends API
@@ -212,7 +213,7 @@ jobs:
               return response.json()
 
           # Send header
-          header = "<b>🤖 Google Trends: AI in the UK - Weekly Report</b>\n\n"
+          header = "<b>🤖 AI & Small Business UK - Weekly Trends Report</b>\n\n"
 
           # Split report into chunks
           chunks = []
@@ -248,7 +249,7 @@ jobs:
         run: |
           curl -F "chat_id=${{ secrets.TELEGRAM_CHANNEL_ID }}" \
                -F "document=@google_trends_report.txt" \
-               -F "caption=Google Trends AI UK Report - $(date '+%Y-%m-%d')" \
+               -F "caption=AI & Small Business UK Trends - $(date '+%Y-%m-%d')" \
                "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument"
 
       - name: Upload results as artifact
