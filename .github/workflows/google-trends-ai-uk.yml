@@ -35,203 +35,150 @@ jobs:
           from tabulate import tabulate
           from datetime import datetime
           import time
+          import random
 
-          # Initialize pytrends
-          pytrends = TrendReq(hl='en-GB', tz=0)
+          def create_pytrends():
+              """Create pytrends instance with browser-like settings"""
+              return TrendReq(
+                  hl='en-GB',
+                  tz=0,
+                  timeout=(10, 30),
+                  retries=2,
+                  backoff_factor=0.5,
+                  requests_args={'headers': {
+                      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+                  }}
+              )
 
-          print("=" * 70)
-          print("GOOGLE TRENDS: AI IN THE UK - INVESTIGATION REPORT")
+          def retry_with_backoff(func, description, max_retries=3, base_delay=15):
+              """Retry function with exponential backoff"""
+              for attempt in range(max_retries):
+                  try:
+                      if attempt > 0:
+                          delay = base_delay * (2 ** (attempt - 1)) + random.uniform(5, 15)
+                          print(f"  Retry {attempt}/{max_retries} for {description} after {delay:.0f}s...")
+                          time.sleep(delay)
+                      return func()
+                  except Exception as e:
+                      error_msg = str(e)
+                      if attempt == max_retries - 1:
+                          print(f"  Failed after {max_retries} attempts: {error_msg}")
+                          return None
+                      if '429' in error_msg:
+                          print(f"  Rate limited on attempt {attempt + 1}, will retry...")
+                      else:
+                          print(f"  Error on attempt {attempt + 1}: {error_msg}")
+              return None
+
+          print("=" * 60)
+          print("GOOGLE TRENDS: AI IN THE UK")
           print(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC")
-          print("=" * 70)
+          print("=" * 60)
 
-          # Define AI-related keywords to investigate
-          ai_keywords = [
-              'artificial intelligence',
-              'ChatGPT',
-              'machine learning',
-              'AI UK',
-              'generative AI'
-          ]
-
-          # Additional trending AI topics
-          ai_topics_secondary = [
-              'Claude AI',
-              'Copilot AI',
-              'AI jobs UK',
-              'AI regulation UK',
-              'OpenAI'
-          ]
-
-          def get_interest_over_time(keywords, geo='GB', timeframe='today 12-m'):
-              """Fetch interest over time for given keywords in UK"""
-              try:
-                  pytrends.build_payload(keywords, cat=0, timeframe=timeframe, geo=geo)
-                  data = pytrends.interest_over_time()
-                  return data
-              except Exception as e:
-                  print(f"Error fetching data: {e}")
-                  return None
-
-          def get_related_queries(keyword, geo='GB'):
-              """Fetch related queries for a keyword"""
-              try:
-                  pytrends.build_payload([keyword], cat=0, timeframe='today 12-m', geo=geo)
-                  related = pytrends.related_queries()
-                  return related
-              except Exception as e:
-                  print(f"Error fetching related queries: {e}")
-                  return None
-
-          def get_interest_by_region(keywords, geo='GB'):
-              """Fetch interest by region within UK"""
-              try:
-                  pytrends.build_payload(keywords, cat=0, timeframe='today 12-m', geo=geo)
-                  by_region = pytrends.interest_by_region(resolution='COUNTRY', inc_low_vol=True)
-                  return by_region
-              except Exception as e:
-                  print(f"Error fetching regional data: {e}")
-                  return None
+          # Simplified keyword list to reduce API calls
+          ai_keywords = ['ChatGPT', 'artificial intelligence', 'AI']
 
           # 1. Interest Over Time Analysis
-          print("\n" + "=" * 70)
-          print("1. INTEREST OVER TIME (Past 12 Months - UK)")
-          print("=" * 70)
+          print("\n" + "=" * 60)
+          print("1. AI SEARCH INTEREST (Past 12 Months - UK)")
+          print("=" * 60)
 
-          data = get_interest_over_time(ai_keywords)
+          def fetch_interest():
+              pt = create_pytrends()
+              pt.build_payload(ai_keywords, cat=0, timeframe='today 12-m', geo='GB')
+              return pt.interest_over_time()
+
+          data = retry_with_backoff(fetch_interest, "interest over time")
           if data is not None and not data.empty:
-              # Get average interest for each keyword
               avg_interest = data.drop('isPartial', axis=1, errors='ignore').mean().sort_values(ascending=False)
               print("\nAverage Search Interest (0-100 scale):")
-              print("-" * 40)
+              print("-" * 45)
               for keyword, value in avg_interest.items():
                   bar = "█" * int(value / 5)
                   print(f"{keyword:25} | {value:5.1f} | {bar}")
 
-              # Show recent trend
-              print("\nMost Recent Week's Interest:")
-              print("-" * 40)
+              print("\nMost Recent Week:")
+              print("-" * 45)
               recent = data.drop('isPartial', axis=1, errors='ignore').tail(1)
               for col in recent.columns:
                   print(f"{col:25} | {recent[col].values[0]:5.0f}")
           else:
-              print("Could not retrieve interest over time data.")
+              print("Could not retrieve interest data.")
 
-          time.sleep(2)  # Rate limiting
+          # Long pause between requests
+          print("\nWaiting before next request...")
+          time.sleep(30 + random.uniform(5, 15))
 
-          # 2. Secondary AI Topics
-          print("\n" + "=" * 70)
-          print("2. SECONDARY AI TOPICS INTEREST (Past 12 Months - UK)")
-          print("=" * 70)
+          # 2. Related Queries for ChatGPT
+          print("\n" + "=" * 60)
+          print("2. RELATED QUERIES FOR 'CHATGPT' IN UK")
+          print("=" * 60)
 
-          data_secondary = get_interest_over_time(ai_topics_secondary)
-          if data_secondary is not None and not data_secondary.empty:
-              avg_interest = data_secondary.drop('isPartial', axis=1, errors='ignore').mean().sort_values(ascending=False)
-              print("\nAverage Search Interest (0-100 scale):")
-              print("-" * 40)
-              for keyword, value in avg_interest.items():
-                  bar = "█" * int(value / 5)
-                  print(f"{keyword:25} | {value:5.1f} | {bar}")
-          else:
-              print("Could not retrieve secondary topics data.")
+          def fetch_chatgpt_related():
+              pt = create_pytrends()
+              pt.build_payload(['ChatGPT'], cat=0, timeframe='today 12-m', geo='GB')
+              return pt.related_queries()
 
-          time.sleep(2)  # Rate limiting
+          related = retry_with_backoff(fetch_chatgpt_related, "ChatGPT related queries")
+          if related and 'ChatGPT' in related:
+              chatgpt_data = related['ChatGPT']
 
-          # 3. Related Queries for "artificial intelligence"
-          print("\n" + "=" * 70)
-          print("3. RELATED QUERIES FOR 'ARTIFICIAL INTELLIGENCE' IN UK")
-          print("=" * 70)
-
-          related = get_related_queries('artificial intelligence')
-          if related and 'artificial intelligence' in related:
-              ai_related = related['artificial intelligence']
-
-              if ai_related['top'] is not None and not ai_related['top'].empty:
+              if chatgpt_data.get('top') is not None and not chatgpt_data['top'].empty:
                   print("\nTop Related Queries:")
-                  print("-" * 40)
-                  top_queries = ai_related['top'].head(10)
-                  print(tabulate(top_queries, headers='keys', tablefmt='simple', showindex=False))
+                  print("-" * 45)
+                  print(tabulate(chatgpt_data['top'].head(10), headers='keys', tablefmt='simple', showindex=False))
 
-              if ai_related['rising'] is not None and not ai_related['rising'].empty:
+              if chatgpt_data.get('rising') is not None and not chatgpt_data['rising'].empty:
                   print("\nRising Queries (Breakout trends):")
-                  print("-" * 40)
-                  rising = ai_related['rising'].head(10)
-                  print(tabulate(rising, headers='keys', tablefmt='simple', showindex=False))
+                  print("-" * 45)
+                  print(tabulate(chatgpt_data['rising'].head(10), headers='keys', tablefmt='simple', showindex=False))
           else:
               print("Could not retrieve related queries.")
 
-          time.sleep(2)  # Rate limiting
+          # Long pause between requests
+          print("\nWaiting before next request...")
+          time.sleep(30 + random.uniform(5, 15))
 
-          # 4. Related Queries for "ChatGPT"
-          print("\n" + "=" * 70)
-          print("4. RELATED QUERIES FOR 'CHATGPT' IN UK")
-          print("=" * 70)
+          # 3. Related Queries for AI
+          print("\n" + "=" * 60)
+          print("3. RELATED QUERIES FOR 'AI' IN UK")
+          print("=" * 60)
 
-          related_chatgpt = get_related_queries('ChatGPT')
-          if related_chatgpt and 'ChatGPT' in related_chatgpt:
-              chatgpt_related = related_chatgpt['ChatGPT']
+          def fetch_ai_related():
+              pt = create_pytrends()
+              pt.build_payload(['AI'], cat=0, timeframe='today 12-m', geo='GB')
+              return pt.related_queries()
 
-              if chatgpt_related['top'] is not None and not chatgpt_related['top'].empty:
+          ai_related = retry_with_backoff(fetch_ai_related, "AI related queries")
+          if ai_related and 'AI' in ai_related:
+              ai_data = ai_related['AI']
+
+              if ai_data.get('top') is not None and not ai_data['top'].empty:
                   print("\nTop Related Queries:")
-                  print("-" * 40)
-                  top_queries = chatgpt_related['top'].head(10)
-                  print(tabulate(top_queries, headers='keys', tablefmt='simple', showindex=False))
+                  print("-" * 45)
+                  print(tabulate(ai_data['top'].head(10), headers='keys', tablefmt='simple', showindex=False))
 
-              if chatgpt_related['rising'] is not None and not chatgpt_related['rising'].empty:
-                  print("\nRising Queries:")
-                  print("-" * 40)
-                  rising = chatgpt_related['rising'].head(10)
-                  print(tabulate(rising, headers='keys', tablefmt='simple', showindex=False))
+              if ai_data.get('rising') is not None and not ai_data['rising'].empty:
+                  print("\nRising Queries (Breakout trends):")
+                  print("-" * 45)
+                  print(tabulate(ai_data['rising'].head(10), headers='keys', tablefmt='simple', showindex=False))
           else:
-              print("Could not retrieve ChatGPT related queries.")
+              print("Could not retrieve related queries.")
 
-          time.sleep(2)  # Rate limiting
-
-          # 5. Trending AI Searches (Real-time)
-          print("\n" + "=" * 70)
-          print("5. TRENDING SEARCHES (Real-time UK)")
-          print("=" * 70)
-
-          try:
-              trending = pytrends.trending_searches(pn='united_kingdom')
-              if trending is not None and not trending.empty:
-                  # Filter for AI-related terms
-                  ai_terms = ['ai', 'artificial', 'chatgpt', 'gpt', 'machine learning',
-                             'robot', 'automation', 'openai', 'claude', 'copilot', 'gemini']
-
-                  print("\nCurrent Trending Searches in UK:")
-                  print("-" * 40)
-                  for idx, search in enumerate(trending[0].head(20)):
-                      print(f"{idx+1:2}. {search}")
-
-                  # Check for AI-related trending
-                  ai_trending = [s for s in trending[0] if any(term in s.lower() for term in ai_terms)]
-                  if ai_trending:
-                      print("\nAI-Related Trending Searches Found:")
-                      print("-" * 40)
-                      for search in ai_trending:
-                          print(f"  - {search}")
-                  else:
-                      print("\nNo explicitly AI-related trending searches at this moment.")
-          except Exception as e:
-              print(f"Could not retrieve trending searches: {e}")
-
-          # 6. Summary
-          print("\n" + "=" * 70)
-          print("SUMMARY & KEY INSIGHTS")
-          print("=" * 70)
+          # Summary
+          print("\n" + "=" * 60)
+          print("SUMMARY")
+          print("=" * 60)
           print("""
-          - This report shows AI-related search trends in the United Kingdom
-          - Interest is measured on a scale of 0-100 (relative to peak interest)
-          - Rising queries indicate emerging topics gaining traction
-          - Data sourced from Google Trends API
-
-          Note: Google Trends data is relative, not absolute search volumes.
-          A value of 100 represents peak popularity for the term.
+          This report shows AI search trends in the UK.
+          - Interest: 0-100 scale (relative to peak)
+          - Rising: Queries gaining significant traction
+          - Data: Google Trends API
           """)
 
-          print("\n" + "=" * 70)
+          print("=" * 60)
           print("END OF REPORT")
-          print("=" * 70)
+          print("=" * 60)
           EOF
 
       - name: Send report to Telegram
@@ -252,7 +199,6 @@ jobs:
               report = f.read()
 
           # Telegram has a 4096 character limit per message
-          # Split the report into chunks if needed
           MAX_LENGTH = 4000
 
           def send_message(text):
@@ -266,7 +212,7 @@ jobs:
               return response.json()
 
           # Send header
-          header = "<b>Google Trends: AI in the UK - Weekly Report</b>\n\n"
+          header = "<b>🤖 Google Trends: AI in the UK - Weekly Report</b>\n\n"
 
           # Split report into chunks
           chunks = []
@@ -287,10 +233,7 @@ jobs:
           # Send each chunk
           print(f"Sending report in {len(chunks)} message(s)...")
           for i, chunk in enumerate(chunks):
-              # Use monospace formatting for the report
-              formatted_chunk = f"<pre>{chunk}</pre>" if i > 0 else chunk.replace(header, '')
-              if i == 0:
-                  formatted_chunk = header + f"<pre>{chunk.replace(header, '')}</pre>"
+              formatted_chunk = f"<pre>{chunk}</pre>" if i > 0 else header + f"<pre>{chunk.replace(header, '')}</pre>"
 
               result = send_message(formatted_chunk)
               if result.get('ok'):
@@ -298,7 +241,7 @@ jobs:
               else:
                   print(f"Failed to send message {i+1}: {result}")
 
-          print("Report sent to Telegram successfully!")
+          print("Report sent to Telegram!")
           EOF
 
       - name: Send report as document to Telegram
