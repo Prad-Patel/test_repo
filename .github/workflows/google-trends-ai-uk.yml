@@ -25,7 +25,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pytrends pandas tabulate requests "urllib3<2.0.0"
+          pip install --no-cache-dir "urllib3<2.0.0"
+          pip install --no-cache-dir pytrends==4.9.2 pandas tabulate requests
 
       - name: Investigate Google Trends for AI in UK
         run: |
