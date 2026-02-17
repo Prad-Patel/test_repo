@@ -25,7 +25,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pytrends pandas tabulate requests
+          pip install pytrends pandas tabulate requests "urllib3<2.0.0"
 
       - name: Investigate Google Trends for AI in UK
         run: |
